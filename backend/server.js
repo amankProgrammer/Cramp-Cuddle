@@ -33,6 +33,9 @@ if (!fs.existsSync(diaryUsersPath)) fs.writeFileSync(diaryUsersPath, '[]');
 
 // === Diary Routes ===
 // Login
+app.use(bodyParser.json());
+
+// Add this before other routes
 app.post('/api/diary/login', (req, res) => {
   const { username, password } = req.body;
   const users = JSON.parse(fs.readFileSync(diaryUsersPath, 'utf-8'));
@@ -86,6 +89,4 @@ app.delete('/api/diary/entries/:entryId', (req, res) => {
   fs.writeFileSync(diaryEntriesPath, JSON.stringify(entries, null, 2));
   res.json({ success: true });
 });
-
-// ... rest of your existing code ...
 
