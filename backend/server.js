@@ -36,6 +36,7 @@ if (!fs.existsSync(diaryUsersPath)) fs.writeFileSync(diaryUsersPath, '[]');
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
+
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
 });
