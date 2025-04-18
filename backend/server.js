@@ -63,9 +63,10 @@ app.post('/api/diary/login', async (req, res) => {
 app.get('/api/diary/entries/:userId', async (req, res) => {
   try {
     const entries = await Entry.find({ userId: req.params.userId }).sort({ date: -1 });
-    res.json(entries);
+    res.json(entries || []); // Ensure we always return an array
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error fetching entries:', error);
+    res.json([]); // Return empty array instead of error response
   }
 });
 
