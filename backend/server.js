@@ -5,7 +5,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
 // Allow only your frontend domain
 const allowedOrigins = ['https://mahi-cramp-cuddle.netlify.app', 'http://localhost:5173'];
