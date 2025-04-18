@@ -40,16 +40,35 @@ app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
 
+// Add new registration endpoint
+app.post('/api/diary/register', async (req, res) => {
+  const { username, password } = req.body;
+  
+  try {
+    const existingUser = await User.findOne({ username });
+    
+    if (existingUser) {
+      res.status(400).json({ success: false, message: 'Username already exists' });
+      return;
+    }
+
+    const user = new User({ username, password });
+    await user.save();
+    res.json({ success: true, userId: user._id });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update login endpoint to not create new users
 app.post('/api/diary/login', async (req, res) => {
   const { username, password } = req.body;
   
   try {
-    let user = await User.findOne({ username });
+    const user = await User.findOne({ username });
     
     if (!user) {
-      user = new User({ username, password });
-      await user.save();
-      res.json({ success: true, userId: user._id });
+      res.status(401).json({ success: false, message: 'User not found' });
     } else if (user.password === password) {
       res.json({ success: true, userId: user._id });
     } else {
