@@ -32,6 +32,7 @@ const Entry = mongoose.model('Entry', entrySchema);
 app.use(cors({
   origin: ['https://mahi-cramp-cuddle.netlify.app', 'http://localhost:5173']
 }));
+
 app.use(bodyParser.json());
 
 // Routes
