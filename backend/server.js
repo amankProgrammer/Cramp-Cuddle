@@ -1,102 +1,93 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Allow only your frontend domain
-const allowedOrigins = ['https://mahi-cramp-cuddle.netlify.app', 'http://localhost:5173'];
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
+// Define schemas
+const userSchema = new mongoose.Schema({
+  username: String,
+  password: String
+});
+
+const entrySchema = new mongoose.Schema({
+  userId: String,
+  title: String,
+  content: String,
+  date: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', userSchema);
+const Entry = mongoose.model('Entry', entrySchema);
+
+// Middleware
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
+  origin: ['https://mahi-cramp-cuddle.netlify.app', 'http://localhost:5173']
 }));
+app.use(bodyParser.json());
 
-// === Data Setup ===
-const dataDir = path.join(__dirname, 'data');
-const diaryEntriesPath = path.join(dataDir, 'diary-entries.json');
-const diaryUsersPath = path.join(dataDir, 'diary-users.json');
-
-// Create directory and files if they don't exist
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-if (!fs.existsSync(diaryEntriesPath)) fs.writeFileSync(diaryEntriesPath, '[]');
-if (!fs.existsSync(diaryUsersPath)) fs.writeFileSync(diaryUsersPath, '[]');
-
-
-// === Diary Routes ===
-// Login
+// Routes
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server listening on port ${PORT}`);
-});
-
-// Move bodyParser before all routes
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Add this before other routes
-app.post('/api/diary/login', (req, res) => {
+app.post('/api/diary/login', async (req, res) => {
   const { username, password } = req.body;
-  const users = JSON.parse(fs.readFileSync(diaryUsersPath, 'utf-8'));
   
-  let user = users.find(u => u.username === username);
-  
-  if (!user) {
-    // Create new user if doesn't exist
-    user = { username, password, id: Date.now().toString() };
-    users.push(user);
-    fs.writeFileSync(diaryUsersPath, JSON.stringify(users, null, 2));
-    res.json({ success: true, userId: user.id });
-  } else if (user.password === password) {
-    res.json({ success: true, userId: user.id });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid password' });
+  try {
+    let user = await User.findOne({ username });
+    
+    if (!user) {
+      user = new User({ username, password });
+      await user.save();
+      res.json({ success: true, userId: user._id });
+    } else if (user.password === password) {
+      res.json({ success: true, userId: user._id });
+    } else {
+      res.status(401).json({ success: false, message: 'Invalid password' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// Get diary entries
-app.get('/api/diary/entries/:userId', (req, res) => {
-  const { userId } = req.params;
-  const entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
-  const userEntries = entries.filter(entry => entry.userId === userId);
-  res.json(userEntries);
+app.get('/api/diary/entries/:userId', async (req, res) => {
+  try {
+    const entries = await Entry.find({ userId: req.params.userId }).sort({ date: -1 });
+    res.json(entries);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Add diary entry
-app.post('/api/diary/entries', (req, res) => {
-  const { userId, title, content } = req.body;
-  const entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
-  
-  const newEntry = {
-    id: Date.now().toString(),
-    userId,
-    title,
-    content,
-    date: new Date().toISOString()
-  };
-  
-  entries.push(newEntry);
-  fs.writeFileSync(diaryEntriesPath, JSON.stringify(entries, null, 2));
-  res.json({ success: true, entry: newEntry });
+app.post('/api/diary/entries', async (req, res) => {
+  try {
+    const entry = new Entry(req.body);
+    await entry.save();
+    res.json({ success: true, entry });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// Delete diary entry
-app.delete('/api/diary/entries/:entryId', (req, res) => {
-  const { entryId } = req.params;
-  let entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
-  entries = entries.filter(entry => entry.id !== entryId);
-  fs.writeFileSync(diaryEntriesPath, JSON.stringify(entries, null, 2));
-  res.json({ success: true });
+app.delete('/api/diary/entries/:entryId', async (req, res) => {
+  try {
+    await Entry.findByIdAndDelete(req.params.entryId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Server listening on port ${PORT}`);
 });
 
