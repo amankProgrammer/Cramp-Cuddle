@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Allow only your frontend domain
-const allowedOrigins = ['https://mahi-cramp-cuddle.netlify.app'];
+const allowedOrigins = ['https://mahi-cramp-cuddle.netlify.app', 'http://localhost:5173'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -19,69 +19,73 @@ app.use(cors({
     }
   }
 }));
-app.use(bodyParser.json());
 
 // === Data Setup ===
 const dataDir = path.join(__dirname, 'data');
-const entriesPath = path.join(dataDir, 'entries.json');
-const messagesPath = path.join(dataDir, 'messages.json');
+const diaryEntriesPath = path.join(dataDir, 'diary-entries.json');
+const diaryUsersPath = path.join(dataDir, 'diary-users.json');
 
 // Create directory and files if they don't exist
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-if (!fs.existsSync(entriesPath)) fs.writeFileSync(entriesPath, '[]');
-if (!fs.existsSync(messagesPath)) fs.writeFileSync(messagesPath, '[]');
+if (!fs.existsSync(diaryEntriesPath)) fs.writeFileSync(diaryEntriesPath, '[]');
+if (!fs.existsSync(diaryUsersPath)) fs.writeFileSync(diaryUsersPath, '[]');
 
-// === Root Route ===
-app.get('/', (req, res) => {
-  res.send('🎉 MoodTracker Backend is running!');
-});
 
-// === Mood Entries Routes ===
-
-// Get all mood entries
-app.get('/api/moods', (req, res) => {
-  const data = fs.readFileSync(entriesPath, 'utf-8');
-  res.json(JSON.parse(data));
-});
-
-// Add or update a mood entry
-app.post('/api/moods', (req, res) => {
-  const newEntry = req.body;
-  const today = newEntry.date;
-
-  let entries = JSON.parse(fs.readFileSync(entriesPath, 'utf-8'));
-  const existingIndex = entries.findIndex(entry => entry.date === today);
-
-  if (existingIndex >= 0) {
-    entries[existingIndex] = newEntry;
+// === Diary Routes ===
+// Login
+app.post('/api/diary/login', (req, res) => {
+  const { username, password } = req.body;
+  const users = JSON.parse(fs.readFileSync(diaryUsersPath, 'utf-8'));
+  
+  let user = users.find(u => u.username === username);
+  
+  if (!user) {
+    // Create new user if doesn't exist
+    user = { username, password, id: Date.now().toString() };
+    users.push(user);
+    fs.writeFileSync(diaryUsersPath, JSON.stringify(users, null, 2));
+    res.json({ success: true, userId: user.id });
+  } else if (user.password === password) {
+    res.json({ success: true, userId: user.id });
   } else {
-    entries.push(newEntry);
+    res.status(401).json({ success: false, message: 'Invalid password' });
   }
-
-  fs.writeFileSync(entriesPath, JSON.stringify(entries, null, 2));
-  res.json({ success: true, entries });
 });
 
-// === Messages Routes ===
-
-// Get all messages
-app.get('/api/messages', (req, res) => {
-  const data = fs.readFileSync(messagesPath, 'utf-8');
-  res.json(JSON.parse(data));
+// Get diary entries
+app.get('/api/diary/entries/:userId', (req, res) => {
+  const { userId } = req.params;
+  const entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
+  const userEntries = entries.filter(entry => entry.userId === userId);
+  res.json(userEntries);
 });
 
-// Add a new message
-app.post('/api/messages', (req, res) => {
-  const newMessage = req.body;
-
-  let messages = JSON.parse(fs.readFileSync(messagesPath, 'utf-8'));
-  messages.unshift(newMessage); // Add to top
-
-  fs.writeFileSync(messagesPath, JSON.stringify(messages, null, 2));
-  res.json({ success: true, messages });
+// Add diary entry
+app.post('/api/diary/entries', (req, res) => {
+  const { userId, title, content } = req.body;
+  const entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
+  
+  const newEntry = {
+    id: Date.now().toString(),
+    userId,
+    title,
+    content,
+    date: new Date().toISOString()
+  };
+  
+  entries.push(newEntry);
+  fs.writeFileSync(diaryEntriesPath, JSON.stringify(entries, null, 2));
+  res.json({ success: true, entry: newEntry });
 });
 
-// === Start Server ===
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+// Delete diary entry
+app.delete('/api/diary/entries/:entryId', (req, res) => {
+  const { entryId } = req.params;
+  let entries = JSON.parse(fs.readFileSync(diaryEntriesPath, 'utf-8'));
+  entries = entries.filter(entry => entry.id !== entryId);
+  fs.writeFileSync(diaryEntriesPath, JSON.stringify(entries, null, 2));
+  res.json({ success: true });
 });
+
+// ... rest of your existing code ...
+
