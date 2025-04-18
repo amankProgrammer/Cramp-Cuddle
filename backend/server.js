@@ -33,7 +33,13 @@ if (!fs.existsSync(diaryUsersPath)) fs.writeFileSync(diaryUsersPath, '[]');
 
 // === Diary Routes ===
 // Login
+app.get('/', (req, res) => {
+  res.json({ message: 'Server is running!' });
+});
+
+// Move bodyParser before all routes
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Add this before other routes
 app.post('/api/diary/login', (req, res) => {
